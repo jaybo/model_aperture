@@ -1,0 +1,41 @@
+Tissue
+======
+
+No dropout
+Epoch 64/64
+52/52 [==============================] - 16s 305ms/step - loss: 0.0060 - val_loss: 0.0111
+
+
+
+3 dropout, 0.35, before max pooling
+
+Epoch 64/64
+47/47 [==============================] - 15s 324ms/step - loss: 0.0068 - val_loss: 0.0113
+
+
+3 dropout, 0.35, after max pooling
+
+Epoch 64/64
+59/59 [==============================] - 18s 313ms/step - loss: 0.0081 - val_loss: 0.0104
+
+Epoch 128/128
+70/70 [==============================] - 22s 318ms/step - loss: 0.0052 - val_loss: 0.0100
+
+
+
+
+
+Aperture
+========
+3 dropout, 0.35, before max pooling
+
+Epoch 64/64
+65/65 [==============================] - 20s 311ms/step - loss: 0.0080 - val_loss: 0.0194
+
+
+3 dropout, 0.35, after max pooling
+
+Epoch 128/128
+63/63 [==============================] - 19s 303ms/step - loss: 0.0062 - val_loss: 0.0081
+
+
