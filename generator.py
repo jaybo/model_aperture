@@ -2,6 +2,7 @@ import glob
 import numpy as np
 import cv2
 from random import randint
+from skimage import exposure
 
 def create_generators(image_dir=r'..\data\optical\062A\640x480\images',
                       label_dir=r'..\data\optical\062A\640x480\masks',
@@ -85,6 +86,7 @@ class batch_generator(object):
         self.height = None
         self.batch_size = None
         self.validation_batch_size = None
+        self.fix_contrast = False
 
     def training_batch(self, batch_size=None):
         ''' if batch_size == None, then batch_size == epoch '''
@@ -98,6 +100,8 @@ class batch_generator(object):
 
             for i in range(self.batch_size):
                 img = cv2.imread(self.training_images[self.epoch_index], cv2.IMREAD_COLOR)
+                if self.fix_contrast:
+                    img = self.stretch_contrast(img)
                 mask = cv2.imread(self.training_masks[self.epoch_index], cv2.IMREAD_GRAYSCALE)
                 if self.width == None:
                     self.width = img.shape[1]
@@ -129,6 +133,8 @@ class batch_generator(object):
 
             for i in range(self.validation_batch_size):
                 img = cv2.imread(self.validation_images[self.validation_index], cv2.IMREAD_COLOR)
+                if self.fix_contrast:
+                    img = self.stretch_contrast(img)
                 mask = cv2.imread(self.validation_masks[self.validation_index], cv2.IMREAD_GRAYSCALE)
                 if self.width == None:
                     self.width = img.shape[1]
@@ -151,6 +157,8 @@ class batch_generator(object):
     def get_random_validation(self):
         index = randint(0, self.validation_steps)
         img = cv2.imread(self.validation_images[index], cv2.IMREAD_COLOR)
+        if self.fix_contrast:
+            img = self.stretch_contrast(img)
         if self.masks:
             mask = cv2.imread(self.validation_masks[index], cv2.IMREAD_GRAYSCALE)
         else:
@@ -160,11 +168,57 @@ class batch_generator(object):
     def get_image_and_mask(self, index):
         '''return the mask and image for an index '''
         img = cv2.imread(self.images[index], cv2.IMREAD_COLOR)
+        if self.fix_contrast:
+            img = self.stretch_contrast(img)        
         if self.masks:
             mask = cv2.imread(self.masks[index], cv2.IMREAD_GRAYSCALE)
         else:
             mask = None
         return img, mask
+    # -------------------------------------------------------
+    # Image processing on optical images
+    # -------------------------------------------------------
+    def stretch_contrast(self, image, percentTop=3.0, percentBottom=0.5):
+        ''' 
+        stretch image contrast of BGR image by finding upper and lower bounds in histogram
+        percent is percentage of pixels which are (bottom and below), or (top and above).
+        This prevents random stuck pixels from messing up the stretch operation.
+        '''
+        img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, s, y = cv2.split(img)
+
+        hist = cv2.calcHist([y], [0], None, [256], [0, 256])
+        total_pix = float(y.size)
+        fractionTop = percentTop / 100.0  # fraction of pixels
+        fractionBottom = percentBottom / 100.0  # fraction of pixels
+        cum_sum_up = np.cumsum(hist) / total_pix
+        cum_sum_down = np.cumsum(hist[:, -1]) / total_pix
+        # print cum_sum_up
+        bottom = 0
+        top = 255
+
+        for j in range(256):
+            if cum_sum_up[j] > fractionBottom:
+                bottom = j
+                break
+
+        for j in range(256):
+            if cum_sum_down[j] > fractionTop:
+                top = 255 - j
+                break
+        #print total_pix, bottom, top
+        #y = cv2.subtract(y, bottom)
+        sf = 255.0 / (top)
+        y = cv2.multiply(y, sf)
+        #y = cv2.add(y, bottom)
+        # y = y * (255.0 / (top - bottom) )
+        #print np.min(y), np.max(y)
+
+        # s = cv2.multiply(s, 1.8)
+        img = cv2.merge((h, s, y))
+        img_rgb_eq = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+
+        return img_rgb_eq
 
     def show_all(self):
         ''' overlay the mask onto the image '''
@@ -184,6 +238,6 @@ class batch_generator(object):
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    bg = batch_generator()
+    bg = batch_generator(image_dir=r"../data/optical/0148B_test_images_from_marc_cropped/*.jpeg")
     bg.show_all()
     #im, mask = bg.get_random_validation()

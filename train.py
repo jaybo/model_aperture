@@ -41,7 +41,7 @@ batch_size = 16
 num_classes = 1
 epochs = 128
 patience = 60
-target_size = (480, 640)
+target_size = (480, 640) # W, H
 steps_per_epoch = 48
 
 loss_name = "binary_crossentropy"
@@ -142,12 +142,15 @@ def train_model_batch_generator(image_dir=None,
             # tissue
             image_dir=r'..\data\optical\062A\640x480\images\images\*.png'
             label_dir=r'..\data\optical\062A\640x480\masks_tissue\masks\*.png'
-            model_out_name = "model_tissue.h5"        
         else:
             # apperture
             image_dir=r'..\data\optical\062A\640x480\images\images\*.png'
             label_dir=r'..\data\optical\062A\640x480\masks_aperture\masks\*.png'
-            model_out_name = "model_aperture.h5"   
+              
+    if tissue:
+        model_out_name = "model_tissue.h5"
+    else:
+        model_out_name = "model_aperture.h5" 
 
     bg = batch_generator(
         image_dir, 
@@ -159,7 +162,7 @@ def train_model_batch_generator(image_dir=None,
 
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=patience, verbose=0),
-        ModelCheckpoint(checkpoint_name, monitor='val_loss', save_best_only=True, verbose=0),
+        #ModelCheckpoint(checkpoint_name, monitor='val_loss', save_best_only=True, verbose=0),
     ]
 
     history = model.fit_generator(
@@ -209,7 +212,7 @@ def visualy_inspect_result():
     cv2.imshow('mask object 1',y_pred[:,:,0])
     cv2.waitKey(0)
 
-def visualy_inspect_all(image_dir, tissue=True):
+def make_prediction_movie(image_dir, tissue=True):
     
     model = get_model()
 
@@ -234,7 +237,7 @@ def visualy_inspect_all(image_dir, tissue=True):
                                 label_dir=None)        
 
     vid_fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    vid_out = cv2.VideoWriter(vid_name, vid_fourcc, 5.0, (640,480))
+    vid_out = cv2.VideoWriter(vid_name, vid_fourcc, 15.0, (640,480))
     font = cv2.FONT_HERSHEY_SIMPLEX
 
     for index in range(bg.image_count):
@@ -244,13 +247,13 @@ def visualy_inspect_all(image_dir, tissue=True):
 
         y_pred= model.predict(img[None,...].astype(np.float32))[0]
         y_pred= y_pred.reshape((IMAGE_H,IMAGE_W,NUMBER_OF_CLASSES))
-        mask[:,:,2] = y_pred[:,:,0] * 255
+        mask[:,:,0] = y_pred[:,:,0] * 255
 
-        alpha = 0.25
+        alpha = 0.5
         cv2.addWeighted(mask, alpha, img, 1 - alpha, 0, img)
 
-        cv2.putText(img,bg.images[index],(22,22), font, 0.2,(255,255,255),1,cv2.LINE_AA)
-        cv2.putText(img,bg.images[index],(20,20), font, 0.2,(0,0,0),1,cv2.LINE_AA)
+        cv2.putText(img,bg.images[index],(21,21), font, 0.3,(0,0,0),1,cv2.LINE_AA)
+        cv2.putText(img,bg.images[index],(20,20), font, 0.3,(255,255,255),1,cv2.LINE_AA)
         vid_out.write(img)
         #cv2.imshow('img',img)
         # key = cv2.waitKey(0)
@@ -276,7 +279,7 @@ if __name__ == '__main__':
         help='Cloud storage bucket to export the model and store temp files')
     parser.add_argument(
         '-t', '--tissue',
-        default=False,
+        default=True,
         type=bool,
         help='Process tissue')
     args = parser.parse_args()
@@ -289,10 +292,6 @@ if __name__ == '__main__':
         else:
             args.image_dir = r'..\data\optical\062A\640x480\images\images\*.png'
             args.label_dir=r"..\data\optical\062A\original\raw_tissue_mask\*.png"
-
-
-
-    #train_model(**arguments)
-    
+   
     #train_model_batch_generator(**arguments)
-    visualy_inspect_all(args.image_dir, args.tissue)
+    make_prediction_movie(args.image_dir, args.tissue)
