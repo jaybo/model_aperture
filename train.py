@@ -26,7 +26,7 @@ from keras.layers import Activation, Dropout, Flatten, Dense, Input, Reshape
 from keras.models import Model, Sequential
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from tensorflow.python.lib.io import file_io  # for better file I/O
-from generator import create_generators, batch_generator
+from generator import batch_generator
 import models
 import sys
 
@@ -241,19 +241,28 @@ def make_prediction_movie(image_dir, tissue=True):
     font = cv2.FONT_HERSHEY_SIMPLEX
 
     for index in range(bg.image_count):
-        img, mask8 = bg.get_image_and_mask(index)
+        img, mask8 = bg.get_image_and_mask(index, source='all', augment=True)
         mask = np.zeros_like(img)
         # mask[:,:,2] = mask8
 
         y_pred= model.predict(img[None,...].astype(np.float32))[0]
         y_pred= y_pred.reshape((IMAGE_H,IMAGE_W,NUMBER_OF_CLASSES))
-        mask[:,:,0] = y_pred[:,:,0] * 255
+        y_pred8 = y_pred[:,:,0] * 255
+        y_pred8 = y_pred8.astype(np.uint8)
+        mask[:,:,0] = y_pred8
 
         alpha = 0.5
-        cv2.addWeighted(mask, alpha, img, 1 - alpha, 0, img)
+        # cv2.addWeighted(mask, alpha, img, 1 - alpha, 0, img)
 
-        cv2.putText(img,bg.images[index],(21,21), font, 0.3,(0,0,0),1,cv2.LINE_AA)
-        cv2.putText(img,bg.images[index],(20,20), font, 0.3,(255,255,255),1,cv2.LINE_AA)
+        cv2.putText(img,bg.images[index],(21,21), font, 0.25,(0,0,0),1,cv2.LINE_AA)
+        cv2.putText(img,bg.images[index],(20,20), font, 0.25,(255,255,255),1,cv2.LINE_AA)
+
+        # outline contour
+        ret,thresh = cv2.threshold(y_pred8,128,255,0)
+        im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(img, contours, -1, (0,255,0), 2)
+
+
         vid_out.write(img)
         #cv2.imshow('img',img)
         # key = cv2.waitKey(0)
@@ -293,5 +302,5 @@ if __name__ == '__main__':
             args.image_dir = r'..\data\optical\062A\640x480\images\images\*.png'
             args.label_dir=r"..\data\optical\062A\original\raw_tissue_mask\*.png"
    
-    #train_model_batch_generator(**arguments)
+    train_model_batch_generator(**arguments)
     make_prediction_movie(args.image_dir, args.tissue)
